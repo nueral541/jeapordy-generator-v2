@@ -1,4 +1,5 @@
 import pygame
+import tkinter as tk
 
 questions = {
     "Geography": {
@@ -77,10 +78,38 @@ def draw_rects(screen, rects, hovered_rect):
         screen.blit(transparent_surface, rect.topleft)
 
 def handle_square_click(rect):
-    category = "placeholder"
-    question = "placeholder"
-    answer = "placeholder"
-    points = "placeholder"
+    category = list(questions.keys())[int(rect.x/rect.width)]
+    print(category)
+    points = list(questions[category].keys())[int((rect.y - 120) / rect.height)]
+    print(points)
+    question = questions[category][points]['question']
+    print(question)
+    answer = questions[category][points]['answer']
+    print(answer)
+    create_text_window(category+" "+points, question)
+
+def create_text_window(title, message):
+    font = pygame.font.Font(None, 36)
+    text = font.render(message, True, (255, 255, 255))
+
+    width, height = text.get_size()
+    question_surface = pygame.Surface((width + 200, 200))
+    question_surface.fill((0, 0, 0))
+    text_rect = text.get_rect(center=(width / 2 + 100, 100))
+    question_surface.blit(text, text_rect)
+
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False 
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
+                running = False 
+
+        screen.fill((0, 0, 0))
+        screen.blit(question_surface, ((1200 - (width + 200)) // 2, (720 - 200) // 2))
+        pygame.display.flip()
+
 
 while running:
     hovered_rect = None
