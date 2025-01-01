@@ -1,43 +1,8 @@
 import pygame
 import tkinter as tk
+from question_gen import question_gen
 
-questions = {
-    "Geography": {
-        '100': {'question': 'What is the capital of France?', 'answer': 'Paris'},
-        '200': {'question': 'Which continent is the Sahara Desert located in?', 'answer': 'Africa'},
-        '300': {'question': 'What is the longest river in the world?', 'answer': 'The Nile River'},
-        '400': {'question': 'Which country has the most islands?', 'answer': 'Sweden'},
-        '500': {'question': 'What is the largest country in the world by area?', 'answer': 'Russia'}
-    },
-    "History": {
-        '100': {'question': 'Who was the first President of the United States?', 'answer': 'George Washington'},
-        '200': {'question': 'What year did World War II end?', 'answer': '1945'},
-        '300': {'question': 'Which ancient civilization built the pyramids?', 'answer': 'The Egyptians'},
-        '400': {'question': 'Who was the famous British Prime Minister during WWII?', 'answer': 'Winston Churchill'},
-        '500': {'question': 'What was the name of the ship that sank in 1912 after hitting an iceberg?', 'answer': 'The Titanic'}
-    },
-    "Science": {
-        '100': {'question': 'What planet is known as the Red Planet?', 'answer': 'Mars'},
-        '200': {'question': 'What is the chemical symbol for water?', 'answer': 'H2O'},
-        '300': {'question': 'What gas do plants absorb from the atmosphere?', 'answer': 'Carbon dioxide'},
-        '400': {'question': 'What is the speed of light in a vacuum?', 'answer': '299,792 kilometers per second'},
-        '500': {'question': 'What is the powerhouse of the cell?', 'answer': 'The mitochondria'}
-    },
-    "Literature": {
-        '100': {'question': 'Who wrote "Romeo and Juliet"?', 'answer': 'William Shakespeare'},
-        '200': {'question': 'What is the title of the first Harry Potter book?', 'answer': 'Harry Potter and the Philosopher\'s Stone'},
-        '300': {'question': 'Who wrote "To Kill a Mockingbird"?', 'answer': 'Harper Lee'},
-        '400': {'question': 'What is the name of the fictional land in "The Chronicles of Narnia"?', 'answer': 'Narnia'},
-        '500': {'question': 'Which book begins with the line: "It was the best of times, it was the worst of times"?', 'answer': 'A Tale of Two Cities'}
-    },
-    "Pop Culture": {
-        '100': {'question': 'Who is the lead singer of the band Queen?', 'answer': 'Freddie Mercury'},
-        '200': {'question': 'What year was the first Star Wars movie released?', 'answer': '1977'},
-        '300': {'question': 'Who voiced Woody in "Toy Story"?', 'answer': 'Tom Hanks'},
-        '400': {'question': 'Which superhero is known as the "Caped Crusader"?', 'answer': 'Batman'},
-        '500': {'question': 'What is the highest-grossing movie of all time?', 'answer': 'Avatar'}
-    }
-}
+questions = question_gen()
 
 pygame.init()
 screen = pygame.display.set_mode((1201, 721))
@@ -45,6 +10,8 @@ clock = pygame.time.Clock()
 running = True
 
 rects = []
+completed_rects = set()
+
 for x in range(0, 1201, 240):
     for y in range(120, 721, 120):
         rects.append(pygame.Rect(x, y, 240, 120))
@@ -58,56 +25,121 @@ def draw_grids(screen):
 def draw_text(screen, questions):
     font = pygame.font.Font(None, 36)
     e = 0
-    for i in questions.keys():
-        text = font.render(i, True, "white")
-        screen.blit(text, (20 + (e * 240), 50))
+    for category in questions.keys():
+        # Wrap the category text
+        wrapped_text = wrap_text(category, font, 200)
+        
+        # Render and display each wrapped line
+        y_offset = 50  # Starting position for the category text
+        for line in wrapped_text:
+            text = font.render(line, True, "white")
+            screen.blit(text, (20 + (e * 240), y_offset))
+            y_offset += font.get_height()  # Move to the next line vertically
+
+        # Now render the point values for the category
         x = 1
-        for j in questions[i].keys():
-            text = font.render(j, True, "white")
+        for points in questions[category].keys():
+            text = font.render(points, True, "white")
             screen.blit(text, (20 + (e * 240), 50 + (x * 120)))
             x += 1
+        
         e += 1
 
 def draw_rects(screen, rects, hovered_rect):
     for rect in rects:
-        color = (0, 0, 255, 0)
-        if rect == hovered_rect:
-            color = (0, 0, 255, 80)
+        if (rect.x, rect.y, rect.width, rect.height) in completed_rects:
+
+            color = (0, 0, 0, 180)  # Darker color with transparency
+        elif rect == hovered_rect:
+            color = (0, 0, 255, 60)  # Hover color
+        else:
+            color = (0, 0, 255, 0)  # Default color
+        
         transparent_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
         transparent_surface.fill(color)
         screen.blit(transparent_surface, rect.topleft)
 
 def handle_square_click(rect):
-    category = list(questions.keys())[int(rect.x/rect.width)]
-    print(category)
-    points = list(questions[category].keys())[int((rect.y - 120) / rect.height)]
-    print(points)
+    if (rect.x, rect.y, rect.width, rect.height) in completed_rects:
+        return
+
+    category_index = int(rect.x / rect.width)
+    category = list(questions.keys())[category_index]
+    points_index = int((rect.y - 120) / rect.height)
+    points = list(questions[category].keys())[points_index]
+
     question = questions[category][points]['question']
-    print(question)
     answer = questions[category][points]['answer']
-    print(answer)
-    create_text_window(category+" "+points, question)
+    create_text_window(category, points, question, answer)
 
-def create_text_window(title, message):
+
+def wrap_text(text, font, max_width):
+    words = text.split(' ')
+    lines = []
+    current_line = []
+
+    for word in words:
+        # Create a test line by adding the word
+        test_line = ' '.join(current_line + [word])
+
+        # If the line fits within the max width, add the word to the line
+        if font.size(test_line)[0] <= max_width:
+            current_line.append(word)
+        else:
+            # If the line doesn't fit, start a new line with the current word
+            if current_line:
+                lines.append(' '.join(current_line))
+            current_line = [word]
+    
+    # Add the last line
+    if current_line:
+        lines.append(' '.join(current_line))
+
+    return lines
+
+# Modify the create_text_window to use the wrap_text function
+def create_text_window(category, points, question, answer):
+    reveal_answer = False
     font = pygame.font.Font(None, 36)
-    text = font.render(message, True, (255, 255, 255))
+    max_width = 600  # Maximum width for text wrapping
+    wrapped_text = wrap_text(question, font, max_width)
 
-    width, height = text.get_size()
-    question_surface = pygame.Surface((width + 200, 200))
-    question_surface.fill((0, 0, 0))
-    text_rect = text.get_rect(center=(width / 2 + 100, 100))
-    question_surface.blit(text, text_rect)
+    line_height = font.get_height()
+    total_height = len(wrapped_text) * line_height + 20
+
+    question_surface = pygame.Surface((max_width + 40, total_height))
+    answer_surface = font.render(answer, True, (255, 255, 255))
+    question_surface.fill('darkblue')
+
+    y_offset = 10
+    for line in wrapped_text:
+        text_surface = font.render(line, True, (255, 255, 255))
+        question_surface.blit(text_surface, (20, y_offset))
+        y_offset += line_height
 
     running = True
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False 
+                running = False
             if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
-                running = False 
+                running = False
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                reveal_answer = not reveal_answer
 
-        screen.fill((0, 0, 0))
-        screen.blit(question_surface, ((1200 - (width + 200)) // 2, (720 - 200) // 2))
+        screen.fill('darkblue')
+        if not reveal_answer:
+            screen.blit(question_surface, ((1200 - (max_width + 40)) // 2, (720 - total_height) // 2))
+        else:
+            screen.blit(answer_surface, ((1200 - (max_width + 40)) // 2, (720 - total_height) // 2))
+
+            rect_to_remove = next(
+                (rect for rect in rects if rect.x == 240 * list(questions.keys()).index(category) and rect.y == 120 + 120 * list(questions[category].keys()).index(points)),
+                None
+            )
+            if rect_to_remove:
+                completed_rects.add((rect_to_remove.x, rect_to_remove.y, rect_to_remove.width, rect_to_remove.height))
+
         pygame.display.flip()
 
 
@@ -119,18 +151,17 @@ while running:
             running = False
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for rect in rects:
-                if rect.collidepoint(event.pos):
+
+                if rect.collidepoint(event.pos) and (rect.x, rect.y, rect.width, rect.height) not in completed_rects:
                     handle_square_click(rect)
 
-
+    screen.fill(("darkblue"))
     mouse_pos = pygame.mouse.get_pos()
 
     for rect in rects:
         if rect.collidepoint(mouse_pos):
             hovered_rect = rect
             break
-
-    screen.fill("darkblue")
 
     draw_grids(screen)
     draw_text(screen, questions)
